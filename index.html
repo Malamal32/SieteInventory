@@ -31,6 +31,8 @@
     --color-accent-2-800: #7a2c10;
     --color-neutral-100: #e4e1da;
     --color-neutral-800: #363c45;
+    /* royal blue, asked for on the descriptive metadata */
+    --color-royal: #1f3fb5;
   }
   html, body { margin: 0; padding: 0; background: var(--color-bg); color: var(--color-text); }
   * { box-sizing: border-box; }
@@ -59,7 +61,7 @@
 
     <div style="display:flex;flex-wrap:wrap;gap:var(--space-1);margin-top:var(--space-3);justify-content:center">
       <sc-for list="{{ typeChips }}" as="c" hint-placeholder-count="6">
-        <button class="{{ c.cls }}" onClick="{{ c.onClick }}" style="cursor:pointer;border:1px solid transparent;font-size:12px;padding:6px 12px;letter-spacing:0.04em;text-transform:uppercase">{{ c.label }}</button>
+        <button class="{{ c.cls }}" onClick="{{ c.onClick }}" style="cursor:pointer;border:1px solid transparent;font-size:clamp(10px,2.1vw,12px);padding:clamp(3px,0.9vw,6px) clamp(7px,2.2vw,12px);letter-spacing:0.04em;text-transform:uppercase">{{ c.label }}</button>
       </sc-for>
     </div>
 
@@ -173,11 +175,11 @@
           </span>
           <span style="flex:1 1 260px;min-width:0;display:flex;flex-direction:column;gap:4px">
             <span style="font-size:17px;line-height:1.25;text-wrap:pretty">{{ it.d }}</span>
-            <span style="font-size:13px;color:color-mix(in srgb, var(--color-text) 62%, transparent);line-height:1.35">{{ it.sub }}</span>
+            <span style="font-size:13px;color:var(--color-royal);line-height:1.35;letter-spacing:0.01em">{{ it.sub }}</span>
           </span>
           <span style="flex:0 0 190px;display:flex;flex-direction:column;gap:3px;text-align:left">
             <span style="font-size:14px;font-variant-numeric:tabular-nums">{{ it.pnText }}</span>
-            <span style="font-size:12px;color:color-mix(in srgb, var(--color-text) 58%, transparent)">{{ it.supText }}</span>
+            <span style="font-size:12px;color:var(--color-royal)">{{ it.supText }}</span>
           </span>
         </button>
 
@@ -200,7 +202,7 @@
               <span class="tag tag-accent-2" style="font-size:11px">Out of stock</span>
             </sc-if>
             <sc-if value="{{ it.inStock }}">
-              <span style="font-size:10px;letter-spacing:0.1em;text-transform:uppercase;color:color-mix(in srgb, var(--color-text) 50%, transparent)">On hand</span>
+              <span style="font-size:10px;letter-spacing:0.1em;text-transform:uppercase;color:var(--color-royal)">On hand</span>
             </sc-if>
             <sc-if value="{{ it.edited }}">
               <span class="tag tag-accent" style="font-size:10px;letter-spacing:0.08em;text-transform:uppercase">Edited</span>
@@ -713,12 +715,11 @@ class Component extends DCLogic {
   set(patch) { this.setState(Object.assign({ limit: 0, open: null }, patch)); }
 
   pretty(it) {
-    if (it.seg) return it.seg.join(" \u00b7 ");
     if (it.loc) return it.loc;
     return "\u2014";
   }
   locLabel(it) {
-    if (it.seg) return "Area \u00b7 bay \u00b7 shelf \u00b7 bin";
+    if (it.seg) return "";
     if (!it.loc) return "No location on file";
     if (it.loc === "NONSTOCK") return "Not stocked";
     if (it.loc === "INACTIVATE NUMBER") return "Inactive record";
