@@ -1,0 +1,954 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="_ds/broadsheet-5cf537c0-7156-4ddf-8ced-4f5856ab98e3/styles.css">
+<script src="_ds/broadsheet-5cf537c0-7156-4ddf-8ced-4f5856ab98e3/_ds_bundle.js"></script>
+<script src="inventory-data.js"></script>
+<style>
+  /* Industrial palette override on the system's own tokens: navy ink and
+     warm-grey paper, a steel-blue accent for interaction, safety orange for
+     stock-outs, and the Siete amber as the brand mark. */
+  :root {
+    --color-bg: #f4f2ee;
+    --color-surface: #e9e6e0;
+    --color-text: #1b2431;
+    --color-divider: #c7c3ba;
+    --color-brand: #9c6500;
+    --color-accent: #1a5c8a;
+    --color-accent-100: #dae7f0;
+    --color-accent-600: #154b71;
+    --color-accent-700: #113d5c;
+    --color-accent-800: #0e3049;
+    --color-accent-2: #c2410c;
+    --color-accent-2-100: #fae1d2;
+    --color-accent-2-800: #7a2c10;
+    --color-neutral-100: #e4e1da;
+    --color-neutral-800: #363c45;
+  }
+  html, body { margin: 0; padding: 0; background: var(--color-bg); color: var(--color-text); }
+  * { box-sizing: border-box; }
+  a { color: var(--color-accent); }
+  a:hover { color: var(--color-accent-700); }
+  button { font-family: inherit; }
+</style>
+</helmet>
+
+<div style="max-width:1180px;margin:0 auto;padding:var(--space-6) var(--space-4) var(--space-8)">
+
+  <div style="display:flex;flex-direction:column;align-items:center;text-align:center;gap:var(--space-2);margin-bottom:var(--space-6)">
+    <img src="siete-logo.png" alt="Siete" style="width:92px;height:auto;mix-blend-mode:multiply">
+    <div style="font-size:11px;letter-spacing:0.14em;text-transform:uppercase;color:var(--color-brand)">Siete Maintenance</div>
+    <h1 style="font-size:clamp(34px,6vw,52px);margin:0;width:100%;line-height:1.15">Parts Locator</h1>
+    <p style="margin:0 auto;max-width:56ch;font-size:16px;color:color-mix(in srgb, var(--color-text) 72%, transparent);text-wrap:pretty">Search a part name, description, measurement, machine, manufacturer, part number or bin code. Every result carries its location.</p>
+  </div>
+
+  <div style="position:sticky;top:0;z-index:5;background:var(--color-bg);padding:var(--space-2) 0 var(--space-3)">
+    <div style="display:flex;gap:var(--space-2);align-items:stretch">
+      <input class="input" ref="{{ searchRef }}" value="{{ q }}" onChange="{{ onQuery }}" placeholder="e.g. 6205 bearing · SKF · push button green · 1/2 npt · 1A07E01B" aria-label="Search parts" style="flex:1 1 auto;min-width:0;min-height:56px;font-size:19px;padding:var(--space-2) var(--space-3);border-radius:var(--radius-md)">
+      <sc-if value="{{ hasQuery }}">
+        <button class="btn btn-secondary" onClick="{{ onClear }}" style="flex:0 0 auto;min-height:56px">Clear</button>
+      </sc-if>
+    </div>
+
+    <div style="display:flex;flex-wrap:wrap;gap:var(--space-1);margin-top:var(--space-3);justify-content:center">
+      <sc-for list="{{ typeChips }}" as="c" hint-placeholder-count="6">
+        <button class="{{ c.cls }}" onClick="{{ c.onClick }}" style="cursor:pointer;border:1px solid transparent;font-size:12px;padding:6px 12px;letter-spacing:0.04em;text-transform:uppercase">{{ c.label }}</button>
+      </sc-for>
+    </div>
+
+    <div style="display:flex;flex-wrap:wrap;gap:var(--space-2);margin-top:var(--space-2);align-items:center">
+      <select class="input" value="{{ machine }}" onChange="{{ onMachine }}" aria-label="Machine" style="flex:1 1 200px;width:auto;min-width:0;cursor:pointer">
+        <option value="">All machines</option>
+        <sc-for list="{{ machines }}" as="o" hint-placeholder-count="0"><option value="{{ o }}">{{ o }}</option></sc-for>
+      </select>
+      <select class="input" value="{{ line }}" onChange="{{ onLine }}" aria-label="Line" style="flex:0 1 150px;width:auto;min-width:0;cursor:pointer">
+        <option value="">All lines</option>
+        <sc-for list="{{ lines }}" as="o" hint-placeholder-count="0"><option value="{{ o }}">{{ o }}</option></sc-for>
+      </select>
+      <select class="input" value="{{ plant }}" onChange="{{ onPlant }}" aria-label="Plant" style="flex:0 1 160px;width:auto;min-width:0;cursor:pointer">
+        <option value="">All plants</option>
+        <sc-for list="{{ plants }}" as="o" hint-placeholder-count="0"><option value="{{ o }}">{{ o }}</option></sc-for>
+      </select>
+      <sc-if value="{{ showSupplier }}" hint-placeholder-val="{{ true }}">
+        <select class="input" value="{{ sup }}" onChange="{{ onSup }}" aria-label="Supplier" style="flex:1 1 200px;width:auto;min-width:0;cursor:pointer">
+          <option value="">All suppliers</option>
+          <sc-for list="{{ suppliers }}" as="o" hint-placeholder-count="0"><option value="{{ o }}">{{ o }}</option></sc-for>
+        </select>
+      </sc-if>
+      <label class="radio" style="gap:var(--space-1);white-space:nowrap;font-size:13px">
+        <input type="checkbox" checked="{{ stockOnly }}" onChange="{{ onStockOnly }}" style="position:static;width:16px;height:16px;opacity:1;accent-color:var(--color-accent);cursor:pointer">
+        In stock only
+      </label>
+      <sc-if value="{{ anyFilter }}">
+        <button class="btn btn-ghost" onClick="{{ onResetFilters }}" style="font-size:13px">Reset filters</button>
+      </sc-if>
+    </div>
+  </div>
+
+  <div style="display:flex;flex-wrap:wrap;gap:var(--space-2);justify-content:space-between;align-items:baseline;padding:var(--space-3) 0 var(--space-1);font-size:13px;color:color-mix(in srgb, var(--color-text) 62%, transparent)">
+    <div>{{ resultLine }}</div>
+    <div style="display:flex;gap:var(--space-3);align-items:baseline">
+      <sc-if value="{{ hasEdits }}">
+        <button onClick="{{ onRevertAll }}" style="font-size:13px;white-space:nowrap;background:transparent;border:0;padding:0;cursor:pointer;color:var(--color-accent-800);text-decoration:underline;text-underline-offset:3px">{{ editNote }}</button>
+      </sc-if>
+      <span style="white-space:nowrap">{{ sortNote }}</span>
+      <button onClick="{{ onToggleForm }}" style="font-size:13px;white-space:nowrap;background:transparent;border:0;padding:0;cursor:pointer;color:var(--color-accent-800);text-decoration:underline;text-underline-offset:3px">{{ formToggleLabel }}</button>
+      <button onClick="{{ onToggleHistory }}" style="font-size:13px;white-space:nowrap;background:transparent;border:0;padding:0;cursor:pointer;color:var(--color-accent-800);text-decoration:underline;text-underline-offset:3px">{{ historyLabel }}</button>
+    </div>
+  </div>
+
+  <sc-if value="{{ historyOpen }}">
+    <div style="padding:var(--space-4) 0 var(--space-6);border-top:1px solid var(--color-divider)">
+      <div style="display:flex;flex-wrap:wrap;gap:var(--space-3);align-items:baseline;justify-content:space-between;margin:var(--space-3) 0 var(--space-4)">
+        <h2 style="font-size:24px;margin:0">Change history</h2>
+        <sc-if value="{{ hasEdits }}">
+          <button onClick="{{ onRevertAll }}" style="font-size:13px;background:transparent;border:0;padding:0;cursor:pointer;color:var(--color-accent-2-800);text-decoration:underline;text-underline-offset:3px">Undo every change</button>
+        </sc-if>
+      </div>
+      <sc-if value="{{ historyEmpty }}">
+        <p style="margin:0;font-size:15px;color:color-mix(in srgb, var(--color-text) 65%, transparent)">Nothing has been changed yet. Every stock count, edit and added part gets logged here with the initials of whoever made it.</p>
+      </sc-if>
+      <div style="display:flex;flex-direction:column">
+        <sc-for list="{{ history }}" as="h" hint-placeholder-count="0">
+          <div style="display:flex;flex-wrap:wrap;gap:var(--space-3);padding:var(--space-3) 0;border-bottom:1px solid color-mix(in srgb, var(--color-text) 9%, transparent)">
+            <div style="flex:0 0 160px;font-size:12px;color:color-mix(in srgb, var(--color-text) 60%, transparent)">
+              <div>{{ h.when }}</div>
+              <div style="letter-spacing:0.1em;text-transform:uppercase;color:var(--color-accent-800)">{{ h.who }}</div>
+            </div>
+            <div style="flex:1 1 260px;min-width:0">
+              <div style="font-size:15px;margin-bottom:3px">{{ h.part }}</div>
+              <sc-for list="{{ h.lines }}" as="l" hint-placeholder-count="1">
+                <div style="font-size:13px;color:color-mix(in srgb, var(--color-text) 70%, transparent)">{{ l }}</div>
+              </sc-for>
+            </div>
+            <button onClick="{{ h.onUndo }}" style="flex:0 0 auto;align-self:flex-start;font-size:13px;background:transparent;border:0;padding:0;cursor:pointer;color:var(--color-accent-800);text-decoration:underline;text-underline-offset:3px">Undo</button>
+          </div>
+        </sc-for>
+      </div>
+    </div>
+  </sc-if>
+
+  <sc-if value="{{ formOpen }}">
+    <div style="padding:var(--space-4) 0 var(--space-6);border-top:1px solid var(--color-divider)">
+      <h2 style="font-size:24px;margin:var(--space-3) 0 var(--space-4)">Add a part</h2>
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,220px),1fr));gap:var(--space-3)">
+        <sc-for list="{{ formFields }}" as="f" hint-placeholder-count="10">
+          <label style="display:flex;flex-direction:column;gap:5px;min-width:0">
+            <span style="font-size:10px;letter-spacing:0.1em;text-transform:uppercase;color:color-mix(in srgb, var(--color-text) 60%, transparent)">{{ f.label }}</span>
+            <input class="input" value="{{ f.value }}" onChange="{{ f.onChange }}" placeholder="{{ f.hint }}" style="min-height:44px;font-size:15px">
+          </label>
+        </sc-for>
+      </div>
+      <div style="display:flex;flex-wrap:wrap;gap:var(--space-2);align-items:center;margin-top:var(--space-4)">
+        <button class="btn btn-primary" onClick="{{ onSaveForm }}" style="min-height:44px">Save part</button>
+        <button class="btn btn-secondary" onClick="{{ onToggleForm }}" style="min-height:44px">Cancel</button>
+        <span style="font-size:13px;color:var(--color-accent-2-800)">{{ formNote }}</span>
+      </div>
+    </div>
+  </sc-if>
+
+  <sc-if value="{{ isLoose }}">
+    <p style="margin:0 0 var(--space-2);font-size:14px;font-style:italic;color:var(--color-accent-2-800)">No part matches every word — showing the closest partial matches.</p>
+  </sc-if>
+
+  <div style="border-top:1px solid var(--color-divider)">
+    <sc-for list="{{ results }}" as="it" hint-placeholder-count="8">
+      <div style="border-bottom:1px solid color-mix(in srgb, var(--color-text) 9%, transparent);display:flex;flex-wrap:wrap;align-items:stretch;background:{{ it.bg }}">
+        <button onClick="{{ it.onToggle }}" aria-expanded="{{ it.open }}" style="flex:1 1 420px;min-width:0;display:flex;flex-wrap:wrap;gap:var(--space-3);align-items:flex-start;padding:var(--space-3) var(--space-2);background:transparent;border:0;cursor:pointer;text-align:left;font:inherit;color:inherit;min-height:56px" style-hover="background:color-mix(in srgb, var(--color-accent) 7%, transparent)">
+          <span style="flex:0 1 178px;min-width:150px;max-width:100%;display:flex;flex-direction:column;gap:2px">
+            <sc-if value="{{ it.isCode }}">
+              <span style="font-size:17px;white-space:nowrap;font-variant-numeric:tabular-nums;letter-spacing:0.06em;color:var(--color-accent-800)">{{ it.locPretty }}</span>
+            </sc-if>
+            <sc-if value="{{ it.isText }}">
+              <span style="font-size:15px;line-height:1.3;overflow-wrap:anywhere;color:var(--color-accent-800)">{{ it.locPretty }}</span>
+            </sc-if>
+            <span style="font-size:10px;letter-spacing:0.1em;text-transform:uppercase;color:color-mix(in srgb, var(--color-text) 50%, transparent)">{{ it.locLabel }}</span>
+          </span>
+          <span style="flex:1 1 260px;min-width:0;display:flex;flex-direction:column;gap:4px">
+            <span style="font-size:17px;line-height:1.25;text-wrap:pretty">{{ it.d }}</span>
+            <span style="font-size:13px;color:color-mix(in srgb, var(--color-text) 62%, transparent);line-height:1.35">{{ it.sub }}</span>
+          </span>
+          <span style="flex:0 0 190px;display:flex;flex-direction:column;gap:3px;text-align:left">
+            <span style="font-size:14px;font-variant-numeric:tabular-nums">{{ it.pnText }}</span>
+            <span style="font-size:12px;color:color-mix(in srgb, var(--color-text) 58%, transparent)">{{ it.supText }}</span>
+          </span>
+        </button>
+
+        <div style="flex:0 0 172px;display:flex;flex-direction:column;justify-content:center;gap:4px;padding:var(--space-2) var(--space-2) var(--space-3)">
+          <div style="display:flex;align-items:center;gap:var(--space-1)">
+            <sc-if value="{{ canEdit }}" hint-placeholder-val="{{ true }}">
+              <button onClick="{{ it.onMinus }}" aria-label="Subtract one" title="Subtract one" style="flex:0 0 auto;width:44px;height:44px;font-size:20px;line-height:1;background:transparent;color:var(--color-text);border:1px solid var(--color-divider);border-radius:var(--radius-md);cursor:pointer" style-hover="background:color-mix(in srgb, var(--color-accent) 12%, transparent);border-color:var(--color-accent)">&#8722;</button>
+            </sc-if>
+            <input value="{{ it.qtyVal }}" onChange="{{ it.onQty }}" onFocus="{{ it.onQtyFocus }}" readOnly="{{ readOnly }}" inputMode="numeric" aria-label="Stock on hand" style="flex:0 0 auto;width:62px;height:44px;text-align:center;font:inherit;font-size:19px;font-variant-numeric:tabular-nums;color:var(--color-text);background:var(--color-surface);border:1px solid var(--color-divider);border-radius:var(--radius-md)">
+            <sc-if value="{{ canEdit }}" hint-placeholder-val="{{ true }}">
+              <button onClick="{{ it.onPlus }}" aria-label="Add one" title="Add one" style="flex:0 0 auto;width:44px;height:44px;font-size:20px;line-height:1;background:transparent;color:var(--color-text);border:1px solid var(--color-divider);border-radius:var(--radius-md);cursor:pointer" style-hover="background:color-mix(in srgb, var(--color-accent) 12%, transparent);border-color:var(--color-accent)">+</button>
+            </sc-if>
+          </div>
+          <div style="display:flex;align-items:center;gap:var(--space-2);justify-content:center;min-height:30px">
+            <sc-if value="{{ it.dirty }}">
+              <button onClick="{{ it.onQtySave }}" style="font-size:12px;padding:4px 10px;min-height:28px;background:var(--color-accent);color:var(--color-bg);border:0;border-radius:var(--radius-md);cursor:pointer" style-hover="background:var(--color-accent-600)">Save</button>
+              <button onClick="{{ it.onQtyCancel }}" style="font-size:12px;padding:4px 8px;min-height:28px;background:transparent;color:var(--color-text);border:0;cursor:pointer;text-decoration:underline;text-underline-offset:2px">Cancel</button>
+            </sc-if>
+            <sc-if value="{{ it.noStock }}">
+              <span class="tag tag-accent-2" style="font-size:11px">Out of stock</span>
+            </sc-if>
+            <sc-if value="{{ it.inStock }}">
+              <span style="font-size:10px;letter-spacing:0.1em;text-transform:uppercase;color:color-mix(in srgb, var(--color-text) 50%, transparent)">On hand</span>
+            </sc-if>
+            <sc-if value="{{ it.edited }}">
+              <span class="tag tag-accent" style="font-size:10px;letter-spacing:0.08em;text-transform:uppercase">Edited</span>
+            </sc-if>
+          </div>
+        </div>
+
+        <sc-if value="{{ it.open }}">
+          <div style="flex:1 1 100%;padding:var(--space-2) var(--space-2) var(--space-6);background:color-mix(in srgb, var(--color-text) 3%, transparent)">
+            <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,190px),1fr));gap:var(--space-4) var(--space-4);padding-top:var(--space-2)">
+              <sc-for list="{{ it.fields }}" as="f" hint-placeholder-count="8">
+                <div style="display:flex;flex-direction:column;gap:3px;min-width:0">
+                  <span style="font-size:10px;letter-spacing:0.1em;text-transform:uppercase;color:color-mix(in srgb, var(--color-text) 55%, transparent)">{{ f.k }}</span>
+                  <span style="font-size:15px;line-height:1.35;overflow-wrap:break-word">{{ f.v }}</span>
+                </div>
+              </sc-for>
+            </div>
+            <div style="margin-top:var(--space-4);display:flex;flex-wrap:wrap;gap:var(--space-3);align-items:center">
+              <sc-if value="{{ it.editing }}">
+                <button class="btn btn-secondary" onClick="{{ it.onEditCancel }}" style="min-height:44px">Cancel editing</button>
+              </sc-if>
+              <sc-if value="{{ it.notEditing }}">
+                <button class="btn btn-secondary" onClick="{{ it.onEdit }}" style="min-height:44px">Edit details</button>
+              </sc-if>
+              <sc-if value="{{ it.isNew }}">
+                <span class="tag tag-accent" style="font-size:11px">Added by hand</span>
+                <button onClick="{{ it.onDelete }}" style="font-size:13px;background:transparent;border:0;padding:0;cursor:pointer;color:var(--color-accent-2-800);text-decoration:underline;text-underline-offset:3px">Remove this part</button>
+              </sc-if>
+            </div>
+
+            <sc-if value="{{ it.editing }}">
+              <div style="margin-top:var(--space-4)">
+                <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,220px),1fr));gap:var(--space-3)">
+                  <sc-for list="{{ it.editFields }}" as="f" hint-placeholder-count="10">
+                    <label style="display:flex;flex-direction:column;gap:5px;min-width:0">
+                      <span style="font-size:10px;letter-spacing:0.1em;text-transform:uppercase;color:color-mix(in srgb, var(--color-text) 60%, transparent)">{{ f.label }}</span>
+                      <input class="input" value="{{ f.value }}" onChange="{{ f.onChange }}" placeholder="{{ f.hint }}" style="min-height:44px;font-size:15px">
+                    </label>
+                  </sc-for>
+                </div>
+                <div style="display:flex;flex-wrap:wrap;gap:var(--space-2);align-items:center;margin-top:var(--space-4)">
+                  <button class="btn btn-primary" onClick="{{ it.onEditSave }}" style="min-height:44px">Review changes</button>
+                  <span style="font-size:13px;color:var(--color-accent-2-800)">{{ editFormNote }}</span>
+                </div>
+              </div>
+            </sc-if>
+            <sc-if value="{{ it.hasNearby }}">
+              <div style="margin-top:var(--space-6)">
+                <div style="font-size:10px;letter-spacing:0.1em;text-transform:uppercase;color:color-mix(in srgb, var(--color-text) 55%, transparent);margin-bottom:var(--space-2)">{{ it.nearbyLabel }}</div>
+                <div style="display:flex;flex-direction:column;gap:var(--space-1)">
+                  <sc-for list="{{ it.nearby }}" as="n" hint-placeholder-count="3">
+                    <button onClick="{{ n.onOpen }}" style="display:flex;flex-wrap:wrap;gap:var(--space-2);align-items:baseline;background:transparent;border:0;padding:5px var(--space-1);cursor:pointer;text-align:left;font:inherit;color:inherit;border-radius:var(--radius-md)" style-hover="background:color-mix(in srgb, var(--color-accent) 9%, transparent)">
+                      <span style="font-size:13px;font-variant-numeric:tabular-nums;letter-spacing:0.06em;color:var(--color-accent-800);flex:0 0 110px">{{ n.locPretty }}</span>
+                      <span style="font-size:14px">{{ n.d }}</span>
+                    </button>
+                  </sc-for>
+                </div>
+              </div>
+            </sc-if>
+          </div>
+        </sc-if>
+      </div>
+    </sc-for>
+  </div>
+
+  <sc-if value="{{ isEmpty }}">
+    <div style="padding:var(--space-4) 0 var(--space-8)">
+      <div style="display:flex;flex-wrap:wrap;gap:var(--space-3);align-items:center;margin-bottom:var(--space-3)">
+        <p style="font-size:22px;margin:0">Nothing matches that.</p>
+        <sc-if value="{{ anyFilter }}">
+          <button class="btn btn-secondary" onClick="{{ onResetFilters }}" style="min-height:44px">Reset filters</button>
+        </sc-if>
+      </div>
+      <p style="margin:0;font-size:15px;color:color-mix(in srgb, var(--color-text) 65%, transparent);max-width:46ch;text-wrap:pretty">Try fewer words, a part number without punctuation, or a measurement on its own. Filters may also be narrowing this.</p>
+    </div>
+  </sc-if>
+
+  <sc-if value="{{ hasMore }}">
+    <div style="padding:var(--space-6) 0;display:flex;gap:var(--space-3);align-items:center;flex-wrap:wrap">
+      <button class="btn btn-primary" onClick="{{ onMore }}">Show more</button>
+      <span style="font-size:13px;color:color-mix(in srgb, var(--color-text) 60%, transparent)">{{ moreNote }}</span>
+    </div>
+  </sc-if>
+
+  <div style="margin-top:var(--space-8);display:flex;flex-wrap:wrap;gap:var(--space-2) var(--space-6);justify-content:center;font-size:11px;letter-spacing:0.08em;text-transform:uppercase;color:color-mix(in srgb, var(--color-text) 55%, transparent)">
+    <span>{{ countTotal }} parts on file</span>
+    <span>{{ countLocated }} with a bin</span>
+    <span>{{ syncNote }}</span>
+  </div>
+
+  <sc-if value="{{ syncError }}">
+    <div style="position:fixed;left:50%;bottom:var(--space-4);transform:translateX(-50%);z-index:40;max-width:min(520px,92vw);padding:var(--space-2) var(--space-3);background:var(--color-accent-2-100);color:var(--color-accent-2-800);border:1px solid var(--color-accent-2);border-radius:var(--radius-md);font-size:14px;text-align:center">{{ syncError }}</div>
+  </sc-if>
+
+  <sc-if value="{{ confirmOpen }}">
+    <div class="dialog-backdrop" style="position:fixed;inset:0;z-index:50">
+      <div class="dialog" style="width:min(520px,100%)">
+        <h2 class="dialog-title" style="margin:0">{{ confirmTitle }}</h2>
+        <div style="font-size:16px">{{ confirmPart }}</div>
+        <div style="display:flex;flex-direction:column;gap:var(--space-1)">
+          <sc-for list="{{ confirmLines }}" as="c" hint-placeholder-count="1">
+            <div style="font-size:14px;color:color-mix(in srgb, var(--color-text) 78%, transparent)">{{ c.l }}</div>
+          </sc-for>
+        </div>
+        <sc-if value="{{ needWho }}">
+          <label style="display:flex;flex-direction:column;gap:5px">
+            <span style="font-size:10px;letter-spacing:0.1em;text-transform:uppercase;color:color-mix(in srgb, var(--color-text) 60%, transparent)">Your initials &mdash; saved to the history</span>
+            <input class="input" value="{{ whoDraft }}" onChange="{{ onWho }}" placeholder="e.g. RJ" style="min-height:44px;font-size:16px;max-width:140px">
+            <span style="font-size:13px;color:var(--color-accent-2-800)">{{ whoNote }}</span>
+          </label>
+        </sc-if>
+        <div class="dialog-actions">
+          <button class="btn btn-secondary" onClick="{{ onConfirmNo }}" style="min-height:44px">No, go back</button>
+          <button class="btn btn-primary" onClick="{{ onConfirmYes }}" style="min-height:44px">Yes, save it</button>
+        </div>
+      </div>
+    </div>
+  </sc-if>
+
+</div>
+
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;allowEdits&quot;:{&quot;editor&quot;:&quot;boolean&quot;,&quot;default&quot;:true,&quot;tsType&quot;:&quot;boolean&quot;,&quot;section&quot;:&quot;Stock&quot;},&quot;pageSize&quot;:{&quot;editor&quot;:&quot;int&quot;,&quot;default&quot;:50,&quot;min&quot;:10,&quot;max&quot;:300,&quot;step&quot;:10,&quot;tsType&quot;:&quot;number&quot;,&quot;section&quot;:&quot;Results&quot;},&quot;showSupplier&quot;:{&quot;editor&quot;:&quot;boolean&quot;,&quot;default&quot;:true,&quot;tsType&quot;:&quot;boolean&quot;,&quot;section&quot;:&quot;Results&quot;},&quot;hideOutOfStock&quot;:{&quot;editor&quot;:&quot;boolean&quot;,&quot;default&quot;:false,&quot;tsType&quot;:&quot;boolean&quot;,&quot;section&quot;:&quot;Results&quot;}}">
+class Component extends DCLogic {
+  state = { q: "", type: "", machine: "", line: "", plant: "", sup: "",
+            stockOnly: false, open: null, limit: 0, data: null, meta: null,
+            overrides: {}, pending: {}, history: [], who: "", whoDraft: "",
+            confirm: null, editing: null, editForm: {}, editNote: "", historyOpen: false,
+            added: [], formOpen: false, formNote: "",
+            form: { d: "", c: "", t: "", m: "", ln: "", p: "", loc: "", s: "", pn: "", q: "" } };
+
+  KEY = "siete-parts-stock-edits-v1";
+  ADDKEY = "siete-parts-added-v1";
+  OVKEY = "siete-parts-overrides-v1";
+  HISTKEY = "siete-parts-history-v1";
+  WHOKEY = "siete-parts-who-v1";
+
+  FORM = [
+    { key: "d", label: "Description", hint: "Required \u2014 what the part is" },
+    { key: "c", label: "Characteristics / specs", hint: "Size, rating, model" },
+    { key: "loc", label: "Location", hint: "e.g. 1A07E01B" },
+    { key: "q", label: "On hand", hint: "0" },
+    { key: "t", label: "Category", hint: "e.g. MECHANICAL" },
+    { key: "m", label: "Machine", hint: "e.g. BAGGER" },
+    { key: "ln", label: "Line", hint: "e.g. L3 L4" },
+    { key: "p", label: "Plant", hint: "e.g. TORTILLAS" },
+    { key: "s", label: "Supplier", hint: "Who it comes from" },
+    { key: "pn", label: "Supplier part no.", hint: "As ordered" }
+  ];
+
+  loadAdded() { /* loadStore brings added parts down with everything else */ }
+  parseLines(v) {
+    if (!v) return [];
+    const u = v.toUpperCase();
+    if (u.trim() === "ALL" || /GENERAL/.test(u)) return ["ALL"];
+    const out = [];
+    const push = (x) => { if (out.indexOf(x) === -1) out.push(x); };
+    const rng = u.match(/L\s*\d\s*[-\u2013]\s*L?\s*\d/g) || [];
+    for (const r of rng) {
+      const mm = r.match(/L\s*(\d)\s*[-\u2013]\s*L?\s*(\d)/);
+      for (let i = +mm[1]; i <= +mm[2]; i++) push("L" + i);
+    }
+    for (const mm of u.match(/L\s*\d/g) || []) push(mm.replace(/\s/g, ""));
+    for (const mm of u.match(/TC\s*\d/g) || []) push(mm.replace(/\s/g, ""));
+    if (/\bVP\b/.test(u)) push("VP");
+    return out;
+  }
+  enrich(f) {
+    const up = (x) => (x || "").trim();
+    const loc = up(f.loc).toUpperCase();
+    const mm = loc.replace(/\s/g, "").match(/^(\d[A-Z])(\d{1,2})([A-Z])(\d{1,2})([A-Z]?)$/);
+    const seg = mm ? [mm[1], mm[2], mm[3], mm[4] + mm[5]] : null;
+    const rec = {
+      id: f.id || ("new-" + Date.now()),
+      d: up(f.d) || "(no description)", c: up(f.c),
+      t: up(f.t).toUpperCase(), m: up(f.m).toUpperCase(), p: up(f.p).toUpperCase(),
+      s: up(f.s), pn: up(f.pn), loc: loc, seg: seg, bay: seg ? seg[0] + seg[1] : "",
+      q: f.q === "" || f.q === undefined || f.q === null ? 0 : (parseInt(f.q, 10) || 0),
+      lnRaw: up(f.ln).toUpperCase(), ln: this.parseLines(up(f.ln)), isNew: !!f.isNew
+    };
+    rec.ln = rec.ln.length ? rec.ln : ["ALL"];
+    const blob = [rec.d, rec.c, rec.pn, rec.m, rec.s, rec.t, rec.loc, rec.p, rec.lnRaw]
+      .filter(Boolean).join(" ").toLowerCase();
+    rec._b = blob;
+    rec._pn = rec.pn.toLowerCase().replace(/[^a-z0-9]/g, "");
+    rec._w = blob.split(/[^a-z0-9/]+/).filter(w => w.length > 1)
+      .filter((w, i, a) => a.indexOf(w) === i);
+    return rec;
+  }
+
+  read(key, fallback) {
+    try { const raw = window.localStorage.getItem(key); return raw ? JSON.parse(raw) : fallback; }
+    catch (e) { return fallback; }
+  }
+  write(key, val) {
+    try { window.localStorage.setItem(key, JSON.stringify(val)); } catch (e) {}
+  }
+  /* Shared build: the server at /api is the source of truth. If it isn't
+     reachable (page opened as a local file), everything falls back to this
+     browser's own storage so the tool still works standalone. */
+  api(path, body) {
+    const opt = body
+      ? { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) }
+      : { cache: "no-store" };
+    return window.fetch(path, opt).then(r => {
+      if (!r.ok) throw new Error("http " + r.status);
+      return r.json();
+    });
+  }
+  takeState(st) {
+    this.setState({
+      overrides: st.overrides || {},
+      added: st.added || [],
+      history: st.history || [],
+      syncError: ""
+    });
+  }
+  loadStore() {
+    const who = this.read(this.WHOKEY, "") || "";
+    this.setState({ who });
+    this.api("/api/state").then(st => {
+      this.remote = true;
+      this.takeState(st);
+      this.poll();
+    }).catch(() => {
+      this.remote = false;
+      this.setState({
+        overrides: this.read(this.OVKEY, {}) || {},
+        added: this.read(this.ADDKEY, []) || [],
+        history: this.read(this.HISTKEY, []) || []
+      });
+      this.forceUpdate();
+    });
+  }
+  poll() {
+    if (!this.remote) return;
+    clearTimeout(this._poll);
+    this._poll = setTimeout(() => {
+      // don't overwrite what someone is in the middle of typing
+      if (this.state.confirm || this.state.editing || this.state.formOpen) { this.poll(); return; }
+      this.api("/api/state").then(st => { this.takeState(st); this.poll(); })
+        .catch(() => { this.setState({ syncError: "Lost contact with the server \u2014 retrying." }); this.poll(); });
+    }, 20000);
+  }
+  /* One write = one request. ops describe the change, changes are the log. */
+  push(ops, log) {
+    if (!this.remote) {
+      for (const op of ops) {
+        if (op.t === "ov-set") { const ov = Object.assign({}, this.state.overrides); if (Object.keys(op.patch).length) ov[op.id] = op.patch; else delete ov[op.id]; this.setState({ overrides: ov }); this.write(this.OVKEY, ov); }
+        if (op.t === "ov-clear") { this.setState({ overrides: {} }); this.write(this.OVKEY, {}); }
+        if (op.t === "add-put") { const a = [op.record].concat((this.state.added || []).filter(x => x.id !== op.record.id)); this.setState({ added: a }); this.write(this.ADDKEY, a); }
+        if (op.t === "add-del") { const a = (this.state.added || []).filter(x => x.id !== op.id); this.setState({ added: a }); this.write(this.ADDKEY, a); }
+      }
+      if (log) { const h = [Object.assign({ ts: Date.now() }, log)].concat(this.state.history || []).slice(0, 400); this.setState({ history: h }); this.write(this.HISTKEY, h); }
+      return;
+    }
+    this.setState({ saving: true });
+    this.api("/api/change", { ops, log }).then(st => {
+      this.takeState(st);
+      this.setState({ saving: false });
+      this.poll();
+    }).catch(() => {
+      this.setState({ saving: false, syncError: "That change did not save \u2014 check the connection and try again." });
+      this.api("/api/state").then(st => this.takeState(st)).catch(() => {});
+    });
+  }
+
+
+  label(key) {
+    for (const f of this.FORM) if (f.key === key) return f.label;
+    return key;
+  }
+
+  /* Ask before writing. changes = [{f, from, to}] on one part. */
+  propose(rec, changes, verb) {
+    const real = changes.filter(c => String(c.from == null ? "" : c.from) !== String(c.to == null ? "" : c.to));
+    if (!real.length) return false;
+    this.setState({
+      confirm: {
+        title: verb || "Save this change?",
+        part: rec.d,
+        lines: real.map(c => this.label(c.f) + ": " + (String(c.from).trim() === "" ? "\u2014" : c.from) + "  \u2192  " + (String(c.to).trim() === "" ? "\u2014" : c.to)),
+        kind: "edit", id: rec.id, changes: real
+      },
+      whoDraft: this.state.who
+    });
+    return true;
+  }
+  proposeRemove(rec) {
+    this.setState({
+      confirm: {
+        title: "Remove this part?",
+        part: rec.d,
+        lines: ["This deletes the record you added. Parts from the Excel sheet can never be deleted here."],
+        kind: "remove", id: rec.id
+      },
+      whoDraft: this.state.who
+    });
+  }
+  proposeUndoAll() {
+    this.setState({
+      confirm: {
+        title: "Undo every local change?",
+        part: "",
+        lines: ["All stock counts and edited details go back to the Excel values. Parts you added by hand stay. The history is kept."],
+        kind: "undoAll"
+      },
+      whoDraft: this.state.who
+    });
+  }
+  cancelConfirm() { this.setState({ confirm: null }); }
+
+  commitConfirm() {
+    const c = this.state.confirm;
+    if (!c) return;
+    const who = (this.state.whoDraft || "").trim().toUpperCase();
+    if (c.kind !== "undoAll" && who.length < 2) { this.setState({ editNote: "who" }); return; }
+    if (who && who !== this.state.who) { this.setState({ who }); this.write(this.WHOKEY, who); }
+
+    if (c.kind === "undoAll") {
+      this.push([{ t: "ov-clear" }], null);
+      this.setState({ confirm: null, pending: {}, editing: null });
+      return;
+    }
+    if (c.kind === "remove") {
+      const gone = (this.state.added || []).filter(a => a.id === c.id)[0];
+      this.push([{ t: "add-del", id: c.id }],
+        { who, id: c.id, part: gone ? gone.d : c.id, changes: [{ f: "d", from: gone ? gone.d : "", to: "(removed)" }] });
+      this.setState({ confirm: null, open: null, editing: null });
+      return;
+    }
+    // field edits: added parts are rewritten in place, sheet parts get an override
+    const isAdded = (this.state.added || []).some(a => a.id === c.id);
+    let op;
+    if (isAdded) {
+      const a = (this.state.added || []).filter(x => x.id === c.id)[0];
+      const merged = Object.assign({}, a, { ln: a.lnRaw, isNew: true });
+      for (const ch of c.changes) merged[ch.f] = ch.to;
+      const rec = this.enrich(merged);
+      rec.id = c.id;
+      op = { t: "add-put", record: rec };
+    } else {
+      const rec = Object.assign({}, this.state.overrides[c.id] || {});
+      for (const ch of c.changes) rec[ch.f] = ch.to;
+      // drop anything that now equals the sheet, so "Edited" only means edited
+      const base = (this.state.data || []).filter(x => x.id === c.id)[0];
+      if (base) {
+        for (const k in rec) {
+          const b = this.fieldVal(base, k);
+          if (String(rec[k] == null ? "" : rec[k]).trim() === String(b).trim()) delete rec[k];
+        }
+      }
+      op = { t: "ov-set", id: c.id, patch: rec };
+    }
+    const part = (this.all().filter(x => x.id === c.id)[0] || {}).d || c.part;
+    this.push([op], { who, id: c.id, part, changes: c.changes });
+    const pending = Object.assign({}, this.state.pending);
+    delete pending[c.id];
+    this.setState({ confirm: null, pending, editing: null, editNote: "" });
+  }
+
+  logChange(who, id, part, changes) {
+    this.push([], { who: who || this.state.who || "\u2014", id, part,
+      changes: changes.map(c => ({ f: c.f, from: c.from, to: c.to })) });
+  }
+  undoEntry(entry) {
+    const rec = this.all().filter(x => x.id === entry.id)[0];
+    if (!rec) return;
+    this.propose(rec, entry.changes.map(c => ({ f: c.f, from: rec[c.f === "ln" ? "lnRaw" : c.f], to: c.from })), "Undo this change?");
+  }
+
+  /* effective record = sheet row with any saved override folded in */
+  applyOv(it) {
+    const ov = this.state.overrides[it.id];
+    if (!ov) return it;
+    const merged = Object.assign({}, it, { ln: it.lnRaw, isNew: it.isNew }, ov);
+    const out = this.enrich(merged);
+    out.id = it.id;
+    out.edited = true;
+    return out;
+  }
+  fieldVal(rec, key) {
+    if (key === "ln") return rec.lnRaw || "";
+    if (key === "q") return rec.q === null || rec.q === undefined ? "" : String(rec.q);
+    return rec[key] || "";
+  }
+
+  SYN = {
+    brg: ["bearing"], brng: ["bearing"], bearings: ["bearing"],
+    pb: ["push", "button"], btn: ["button"], sw: ["switch"], swtch: ["switch"],
+    sol: ["solenoid"], cyl: ["cylinder"], vlv: ["valve"], mtr: ["motor"],
+    hyd: ["hydraulic"], pneu: ["pneumatic"], elec: ["electric"], elect: ["electric"],
+    mech: ["mechanical"], prox: ["proximity"], sens: ["sensor"], phot: ["photoeye"],
+    rly: ["relay"], cont: ["contactor"], sprkt: ["sprocket"], chn: ["chain"],
+    blt: ["belt"], flt: ["filter"], gskt: ["gasket"], brk: ["brake"],
+    temp: ["temperature"], cw: ["checkweigher"], vfd: ["drive"], hmi: ["terminal"],
+    oring: ["o", "ring"], oil: ["lubricant"], grease: ["lubricant"]
+  };
+
+  componentDidMount() {
+    this.pull(0);
+    this.loadStore();
+    this.loadAdded();
+    this._key = (e) => {
+      if (e.key === "/" && document.activeElement !== this.input) {
+        e.preventDefault();
+        if (this.input) this.input.focus();
+      }
+    };
+    window.addEventListener("keydown", this._key);
+  }
+  componentWillUnmount() {
+    window.removeEventListener("keydown", this._key);
+    clearTimeout(this._poll);
+  }
+
+  pull(n) {
+    if (window.INVENTORY) {
+      this.setState({ data: window.INVENTORY, meta: window.INVENTORY_META || null });
+      if (this.input) this.input.focus();
+    } else if (n < 60) {
+      setTimeout(() => this.pull(n + 1), 60);
+    }
+  }
+
+  pageSize() { const v = parseInt(this.props.pageSize, 10); return v > 0 ? v : 50; }
+
+  near1(a, b) {
+    if (a === b) return true;
+    const la = a.length, lb = b.length;
+    if (Math.abs(la - lb) > 1) return false;
+    let i = 0, j = 0, d = 0;
+    while (i < la && j < lb) {
+      if (a[i] === b[j]) { i++; j++; continue; }
+      d++; if (d > 1) return false;
+      if (la > lb) i++; else if (lb > la) j++; else { i++; j++; }
+    }
+    if (i < la || j < lb) d++;
+    return d <= 1;
+  }
+
+  expand(q) {
+    const raw = q.split(/[^a-z0-9/."]+/).filter(Boolean)
+      .map(t => t.replace(/^[."]+|[."]+$/g, "")).filter(t => t.length > 0);
+    return raw.map(t => {
+      const alts = [t];
+      const syn = this.SYN[t];
+      if (syn) for (const s of syn) alts.push(s);
+      if (t.length > 3 && t.endsWith("s")) alts.push(t.slice(0, -1));
+      else if (t.length > 2) alts.push(t + "s");
+      // stem the token so a word family reads as one word: printer/printing/
+      // printhead all fall back to "print", heater to "heat", seals to "seal"
+      const stem = t.replace(/(ers|er|ings|ing|ors|or|ed|es|s)$/, "");
+      if (stem.length >= 4 && alts.indexOf(stem) === -1) alts.push(stem);
+      return alts;
+    });
+  }
+
+  scoreTok(it, t) {
+    const digits = t.replace(/[^a-z0-9]/g, "");
+    if (digits.length >= 3 && it._pn.indexOf(digits) !== -1) return 7;
+    if (it._w.indexOf(t) !== -1) return 4;
+    for (const w of it._w) if (w.length > t.length && w.indexOf(t) === 0) return 2.5;
+    if (it._b.indexOf(t) !== -1) return 1.5;
+    if (t.length >= 4) for (const w of it._w) if (w.length >= 4 && this.near1(w, t)) return 1;
+    return 0;
+  }
+
+  all() {
+    const s = this.state;
+    const base = s.data || [];
+    const list = s.added && s.added.length ? s.added.concat(base) : base;
+    const ov = s.overrides || {};
+    if (!Object.keys(ov).length) return list;
+    return list.map(it => (ov[it.id] ? this.applyOv(it) : it));
+  }
+  qtyOf(it) { return it.q; }
+
+  find() {
+    const s = this.state;
+    let list = this.all();
+    if (s.type) list = list.filter(i => i.t === s.type);
+    if (s.machine) list = list.filter(i => i.m === s.machine);
+    if (s.plant) list = list.filter(i => i.p === s.plant);
+    if (s.sup) list = list.filter(i => i.s === s.sup);
+    if (s.line) list = list.filter(i => i.ln.indexOf(s.line) !== -1 || i.ln.indexOf("ALL") !== -1);
+    if (s.stockOnly || this.props.hideOutOfStock) list = list.filter(i => this.qtyOf(i) > 0);
+
+    const q = (s.q || "").toLowerCase().trim();
+    if (!q) return { list: list.slice().sort((a, b) => ((+a.id) || 1e9) - ((+b.id) || 1e9)), loose: false };
+
+    const toks = this.expand(q);
+    if (!toks.length) return { list, loose: false };
+    const strict = [], loose = [];
+    for (const it of list) {
+      let total = 0, hits = 0;
+      for (const alts of toks) {
+        let best = 0;
+        for (const t of alts) { const v = this.scoreTok(it, t); if (v > best) best = v; }
+        if (best > 0) { hits++; total += best; }
+      }
+      if (hits === toks.length) { strict.push([total + (this.qtyOf(it) > 0 ? 0.6 : 0), it]); }
+      else if (hits > 0) { loose.push([(total * hits) / toks.length, it]); }
+    }
+    if (strict.length) { strict.sort((a, b) => b[0] - a[0]); return { list: strict.map(x => x[1]), loose: false }; }
+    loose.sort((a, b) => b[0] - a[0]);
+    return { list: loose.map(x => x[1]), loose: true };
+  }
+
+  set(patch) { this.setState(Object.assign({ limit: 0, open: null }, patch)); }
+
+  pretty(it) {
+    if (it.seg) return it.seg.join(" \u00b7 ");
+    if (it.loc) return it.loc;
+    return "\u2014";
+  }
+  locLabel(it) {
+    if (it.seg) return "Area \u00b7 bay \u00b7 shelf \u00b7 bin";
+    if (!it.loc) return "No location on file";
+    if (it.loc === "NONSTOCK") return "Not stocked";
+    if (it.loc === "INACTIVATE NUMBER") return "Inactive record";
+    return "Named location";
+  }
+
+  renderVals() {
+    const s = this.state;
+    const showSupplier = this.props.showSupplier !== false;
+    if (!s.data) {
+      return { countTotal: "\u2014", countLocated: "\u2014", results: [], resultLine: "Loading the part list\u2026",
+               sortNote: "", machines: [], lines: [], plants: [], suppliers: [], typeChips: [],
+               showSupplier: showSupplier, q: "", searchRef: (el) => { this.input = el; },
+               showPrompt: false, canEdit: false, readOnly: true, hasEdits: false,
+               formOpen: false, formToggleLabel: "Add a part", formFields: [], formNote: "",
+               confirmOpen: false, confirmLines: [], historyOpen: false, history: [],
+               historyLabel: "History", historyEmpty: true, needWho: false, whoDraft: "", whoNote: "",
+               syncNote: "Connecting\u2026", syncError: "" };
+    }
+    const data = this.all();
+    const meta = s.meta || {};
+    const facet = (k) => {
+      const seen = {};
+      for (const i of data) if (i[k]) seen[i[k]] = 1;
+      return Object.keys(seen).sort((a, b) => a.localeCompare(b));
+    };
+    const hasQuery0 = !!(s.q || "").trim();
+    const anyFilter0 = !!(s.type || s.machine || s.line || s.plant || s.sup || s.stockOnly);
+    const showPrompt = !hasQuery0 && !anyFilter0;
+    const canEdit = this.props.allowEdits !== false;
+    const found = showPrompt ? { list: [], loose: false } : this.find();
+    const size = this.pageSize();
+    const shown = found.list.slice(0, size + s.limit);
+    const byBay = {};
+    for (const it of data) if (it.bay) { (byBay[it.bay] = byBay[it.bay] || []).push(it); }
+
+    const open = (id) => this.setState({ open: id });
+
+    const results = shown.map((it, rowIndex) => {
+      const isOpen = s.open === it.id;
+      const subBits = [];
+      if (it.m) subBits.push(it.m);
+      if (it.lnRaw && it.lnRaw.toUpperCase() !== "ALL") subBits.push("Line " + it.lnRaw);
+      if (it.t) subBits.push(it.t);
+      const ovRec = s.overrides[it.id];
+      const edited = !!ovRec;
+      const pend = s.pending[it.id];
+      const qv = (pend === undefined || pend === null) ? it.q : pend;
+      const dirty = qv !== it.q;
+      const fields = [];
+      if (it.c) fields.push({ k: "Characteristics", v: it.c });
+      fields.push({ k: "Location", v: it.loc || "\u2014" });
+      fields.push({ k: "On hand", v: it.q === null ? "\u2014" : String(it.q) });
+      if (it.m) fields.push({ k: "Machine", v: it.m });
+      if (it.lnRaw) fields.push({ k: "Line", v: it.lnRaw });
+      if (it.p) fields.push({ k: "Plant", v: it.p });
+      if (it.t) fields.push({ k: "Category", v: it.t });
+      if (showSupplier && it.s) fields.push({ k: "Supplier", v: it.s });
+      if (showSupplier && it.pn) fields.push({ k: "Supplier part no.", v: it.pn });
+      fields.push({ k: "Item no.", v: it.id });
+
+      const near = (it.bay && byBay[it.bay] ? byBay[it.bay] : [])
+        .filter(n => n.id !== it.id).slice(0, 6)
+        .map(n => ({ id: n.id, d: n.d, locPretty: this.pretty(n), onOpen: () => open(n.id) }));
+
+      return {
+        id: it.id, d: it.d, q: qv,
+        qtyVal: qv === null ? "" : String(qv),
+        edited: edited, dirty: dirty,
+        stage: (v) => {
+          const pending = Object.assign({}, this.state.pending);
+          pending[it.id] = Math.max(0, v);
+          this.setState({ pending });
+        },
+        onQty: (e) => {
+          const pending = Object.assign({}, this.state.pending);
+          pending[it.id] = Math.max(0, parseInt(String(e.target.value).replace(/[^0-9]/g, ""), 10) || 0);
+          this.setState({ pending });
+        },
+        onQtyFocus: (e) => e.target.select(),
+        onPlus: () => {
+          const pending = Object.assign({}, this.state.pending);
+          pending[it.id] = Math.max(0, (qv || 0) + 1);
+          this.setState({ pending });
+        },
+        onMinus: () => {
+          const pending = Object.assign({}, this.state.pending);
+          pending[it.id] = Math.max(0, (qv || 0) - 1);
+          this.setState({ pending });
+        },
+        onQtyCancel: () => {
+          const pending = Object.assign({}, this.state.pending);
+          delete pending[it.id];
+          this.setState({ pending });
+        },
+        onQtySave: () => this.propose(it, [{ f: "q", from: it.q, to: qv }], "Change the stock count?"),
+        sub: subBits.join("  \u00b7  "),
+        pnText: showSupplier ? (it.pn || "\u2014") : "",
+        supText: showSupplier ? it.s : "",
+        inStock: qv > 0, noStock: qv === 0,
+        locPretty: this.pretty(it), locLabel: this.locLabel(it),
+        isCode: !!it.seg, isText: !it.seg,
+        bg: rowIndex % 2 === 1 ? "color-mix(in srgb, var(--color-text) 4%, transparent)" : "transparent",
+        isNew: !!it.isNew,
+        onDelete: () => this.proposeRemove(it),
+        editing: s.editing === it.id, notEditing: s.editing !== it.id,
+        onEdit: () => {
+          const ef = {};
+          for (const f of this.FORM) ef[f.key] = this.fieldVal(it, f.key);
+          this.setState({ editing: it.id, editForm: ef, editNote: "" });
+        },
+        onEditCancel: () => this.setState({ editing: null, editNote: "" }),
+        onEditSave: () => {
+          const ef = this.state.editForm || {};
+          if (!(ef.d || "").trim()) { this.setState({ editNote: "A description is required." }); return; }
+          const changes = this.FORM.map(f => ({ f: f.key, from: this.fieldVal(it, f.key), to: (ef[f.key] || "").trim() }));
+          if (!this.propose(it, changes, "Save these changes?")) this.setState({ editNote: "Nothing changed." });
+        },
+        editFields: this.FORM.map(f => ({
+          label: f.label, hint: f.hint, value: (s.editForm || {})[f.key] || "",
+          onChange: (e) => this.setState({ editForm: Object.assign({}, this.state.editForm, { [f.key]: e.target.value }), editNote: "" })
+        })),
+        open: isOpen, onToggle: () => this.setState({ open: isOpen ? null : it.id }),
+        fields: fields,
+        hasNearby: near.length > 0, nearby: near,
+        nearbyLabel: "Also in bay " + it.bay
+      };
+    });
+
+    const chip = (label, value) => ({
+      label, cls: s.type === value ? "tag tag-accent" : "tag tag-neutral",
+      onClick: () => this.set({ type: s.type === value ? "" : value })
+    });
+    const typeChips = [{ label: "All categories", cls: s.type === "" ? "tag tag-accent" : "tag tag-neutral", onClick: () => this.set({ type: "" }) }]
+      .concat(facet("t").map(t => chip(t, t)));
+    const lineSeen = {};
+    for (const i of data) for (const l of i.ln) lineSeen[l] = 1;
+
+    const n = found.list.length;
+    const hasQuery = hasQuery0;
+    const anyFilter = anyFilter0;
+    const editKeys = Object.keys(s.overrides || {});
+    const hist = s.history || [];
+    const fmt = (ts) => new Date(ts).toLocaleString(undefined, { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" });
+    const c = s.confirm;
+    const resultLine = showPrompt
+      ? "Search or pick a filter to begin"
+      : (n === 0
+        ? "No matches"
+        : (n === 1 ? "1 part" : n.toLocaleString() + " parts")
+          + (results.length < n ? " \u2014 showing " + results.length : "")
+          + (hasQuery ? "" : " \u00b7 filtered"));
+
+    return {
+      showPrompt, canEdit, readOnly: !canEdit,
+      hasEdits: editKeys.length > 0,
+      editNote: editKeys.length === 1 ? "1 part changed here" : editKeys.length + " parts changed here",
+      onRevertAll: () => this.proposeUndoAll(),
+      editFormNote: s.editNote === "who" ? "" : (s.editNote || ""),
+      syncNote: s.saving ? "Saving\u2026" : (this.remote ? "Shared \u00b7 live" : "This browser only"),
+      syncError: s.syncError || "",
+      historyLabel: s.historyOpen ? "Close history" : (hist.length ? "History (" + hist.length + ")" : "History"),
+      onToggleHistory: () => this.setState({ historyOpen: !s.historyOpen }),
+      historyOpen: s.historyOpen,
+      historyEmpty: hist.length === 0,
+      history: hist.slice(0, 200).map((h, i) => ({
+        when: fmt(h.ts), who: h.who || "\u2014", part: h.part,
+        lines: (h.changes || []).map(ch => this.label(ch.f) + ": " + (String(ch.from || "").trim() === "" ? "\u2014" : ch.from) + "  \u2192  " + (String(ch.to || "").trim() === "" ? "\u2014" : ch.to)),
+        onUndo: () => this.undoEntry(h)
+      })),
+      confirmOpen: !!c,
+      confirmTitle: c ? c.title : "",
+      confirmPart: c ? c.part : "",
+      confirmLines: c ? c.lines.map(l => ({ l })) : [],
+      needWho: !!c && c.kind !== "undoAll",
+      whoDraft: s.whoDraft,
+      whoNote: s.editNote === "who" ? "Two letters or more, please." : "",
+      onWho: (e) => this.setState({ whoDraft: e.target.value, editNote: "" }),
+      onConfirmYes: () => this.commitConfirm(),
+      onConfirmNo: () => this.cancelConfirm(),
+      formOpen: s.formOpen,
+      formToggleLabel: s.formOpen ? "Close" : "Add a part",
+      formNote: s.formNote,
+      formFields: this.FORM.map(f => ({
+        label: f.label, hint: f.hint, value: s.form[f.key] || "",
+        onChange: (e) => this.setState({ form: Object.assign({}, this.state.form, { [f.key]: e.target.value }), formNote: "" })
+      })),
+      onToggleForm: () => this.setState({ formOpen: !s.formOpen, formNote: "" }),
+      onSaveForm: () => {
+        const f = this.state.form;
+        if (!(f.d || "").trim()) { this.setState({ formNote: "A description is required." }); return; }
+        const rec = this.enrich(Object.assign({}, f, { isNew: true }));
+        this.push([{ t: "add-put", record: rec }],
+          { who: this.state.who, id: rec.id, part: rec.d, changes: [{ f: "d", from: "(new part)", to: rec.d }] });
+        this.setState({
+          formOpen: false, formNote: "",
+          form: { d: "", c: "", t: "", m: "", ln: "", p: "", loc: "", s: "", pn: "", q: "" },
+          q: rec.d, open: rec.id, limit: 0
+        });
+      },
+      q: s.q,
+      searchRef: (el) => { this.input = el; },
+      onQuery: (e) => this.set({ q: e.target.value }),
+      onClear: () => { this.set({ q: "" }); if (this.input) this.input.focus(); },
+      hasQuery, anyFilter,
+      countTotal: data.length.toLocaleString(),
+      countLocated: data.filter(i => i.loc && i.loc !== "NONSTOCK" && i.loc !== "INACTIVATE NUMBER").length.toLocaleString(),
+      typeChips,
+      machines: facet("m"), lines: Object.keys(lineSeen).sort(),
+      plants: facet("p"), suppliers: facet("s"),
+      machine: s.machine, line: s.line, plant: s.plant, sup: s.sup,
+      stockOnly: s.stockOnly || !!this.props.hideOutOfStock,
+      showSupplier,
+      onMachine: (e) => this.set({ machine: e.target.value }),
+      onLine: (e) => this.set({ line: e.target.value }),
+      onPlant: (e) => this.set({ plant: e.target.value }),
+      onSup: (e) => this.set({ sup: e.target.value }),
+      onStockOnly: (e) => this.set({ stockOnly: e.target.checked }),
+      onResetFilters: () => this.set({ type: "", machine: "", line: "", plant: "", sup: "", stockOnly: false }),
+      results,
+      resultLine,
+      sortNote: hasQuery ? "Best match first" : "By item number",
+      isLoose: found.loose, isEmpty: n === 0 && !showPrompt,
+      hasMore: results.length < n,
+      moreNote: (n - results.length).toLocaleString() + " more",
+      onMore: () => this.setState({ limit: s.limit + size })
+    };
+  }
+}
+
+</script>
+</body>
+</html>
