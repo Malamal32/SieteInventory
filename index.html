@@ -9,13 +9,6 @@
 <x-dc>
 <helmet>
 <link rel="stylesheet" href="_ds/broadsheet-5cf537c0-7156-4ddf-8ced-4f5856ab98e3/styles.css">
-<link rel="manifest" href="manifest.webmanifest">
-<link rel="apple-touch-icon" href="apple-touch-icon.png">
-<meta name="theme-color" content="#f4f2ee">
-<meta name="mobile-web-app-capable" content="yes">
-<meta name="apple-mobile-web-app-capable" content="yes">
-<meta name="apple-mobile-web-app-status-bar-style" content="default">
-<meta name="apple-mobile-web-app-title" content="Parts">
 <script src="_ds/broadsheet-5cf537c0-7156-4ddf-8ced-4f5856ab98e3/_ds_bundle.js"></script>
 <script src="inventory-data.js"></script>
 <style>
@@ -610,10 +603,6 @@ class Component extends DCLogic {
   };
 
   componentDidMount() {
-    // installable-app support: only when served over http(s), never from a file
-    if (window.navigator.serviceWorker && window.location.protocol.indexOf("http") === 0) {
-      window.navigator.serviceWorker.register("sw.js").catch(() => {});
-    }
     this.pull(0);
     this.loadStore();
     this.loadAdded();
